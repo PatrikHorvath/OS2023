@@ -1,0 +1,78 @@
+Po prezretí výstupu backtrace, ktorá funkcia zavolala funkciu syscall?
+
+> funkcia void usertrap(void), ktorá je súčasťou trap.c na riadku 67
+
+
+------
+------------
+------------------------------------
+------------
+------
+
+
+Aká je hodnota p->trapframe->a7 a čo reprezentuje? (Pomôcka: pozrite sa do user/initcode.S na prvý program, ktorý xv6 spustí.)
+
+> odkrokoval som program a zobrazil hodnotu "p p->trapframe->a7" : $1 = 7
+> hodnota 7 v syscall.h značí       #define SYS_exec    7
+> zavolá sa system call "exec" a spustí init s argv
+
+
+------
+------------
+------------------------------------
+------------
+------
+
+
+Aký je predchádzajúci mód, v ktorom sa nachádzal procesor? Podľa čoho ste to zistili?
+
+#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User
+#define SSTATUS_SPIE (1L << 5) // Supervisor Previous Interrupt Enable
+#define SSTATUS_UPIE (1L << 4) // User Previous Interrupt Enable
+#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
+#define SSTATUS_UIE (1L << 0)  // User Interrupt Enable
+
+> 0x22 = 0b100010 a teda    1L << 1     ||      1L << 5
+> taktiež má 0x22 iba 2 hex miesta, teda 1L << 8 nemôže byť 1=Supervisor, pretože inak by bol hex 0x122
+> teda predchádzajúci mód je User
+
+
+------
+------------
+------------------------------------
+------------
+------
+
+
+Zapíšte inštrukciu jazyka assembly na ktorej jadro vyvolalo panic. V ktorom registri je uložená hodnota num?
+
+> 80002052:	00002683          	lw	a3,0(zero) # 0 <_entry-0x80000000>
+> predpokladám a3
+
+
+------
+------------
+------------------------------------
+------------
+------
+
+
+Prečo jadro spadlo? Pomôcka: pozrite sa na obrázok 3-3 z xv6 knižky. Je v priestore jadra namapovaná adresa 0?
+Potvrdzuje to obsah registra scause vyššie? (Pozrite si popis registra scause v príručke privilegovaných inštrukcií architektúry RISC-V).
+
+> Adresa 0 nie je namapovaná, je unused, scause 0x000000000000000d, kde 0xd = 13 v desiatkovej sústave
+> číslo 13 zodpovedá v RISC-V Privileged Architecture na strane 71 "Load page fault"
+> pokúšali sme sa accesnúť pamäť, ktorá není mapovaná
+
+
+------
+------------
+------------------------------------
+------------
+------
+
+Aký je názov binárky, ktorá bežala, keď nastal panic? Aký je pid procesu?
+(debil som na tomoto stravil 20 minut lebo neviem čítat)
+
+> nazov teda p->name je "initcode\000\000\000\000\000\000\000"
+> pid teda p->pid je 1
