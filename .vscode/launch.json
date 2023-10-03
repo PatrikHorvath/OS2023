@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/kernel/kernel",
+            "cwd": "${workspaceFolder}",
+            // Speciry the full path to riscv64-unknown-elf-gdb.
+            // Mac users should use the gdb in SiFive toolchain.
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            // Replace 25501 with (25000 + YOURID) where YOURID is the integer given by the command "id -u".
+            "miDebuggerServerAddress": "127.0.0.1:26000",
+            "MIMode": "gdb",
+            "stopAtEntry": true,
+            "preLaunchTask": "fix_gdbinit",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": false
+                }
+            ]
+        }
+    ]
+}
