@@ -150,7 +150,11 @@ found:
   p->ticks = 0;
   p->handler = 0;
   p->ticks_since = 0;
-  p->alarm_on = 0;
+  if((p->tf_saved = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
 
   return p;
 }
@@ -163,9 +167,16 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
-  p->trapframe = 0;
+
+  if(p->tf_saved)
+    kfree((void*)p->tf_saved);
+
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+
+  
+  p->tf_saved = 0;
+  p->trapframe = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;

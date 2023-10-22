@@ -108,6 +108,7 @@ uint64 sys_sigalarm(void)
 
   p->ticks = ticks;
   p->handler = addr;
+  p->alarm_on = 1;
 
   return 0;
 }
@@ -115,8 +116,11 @@ uint64 sys_sigalarm(void)
 uint64 sys_sigreturn(void)
 {
   struct proc *p = myproc();
-  p->alarm_on = 0;
-  p->ticks_since = 0;
   
-  return 0;
+  // restore trapframe
+  *p->trapframe = *p->tf_saved;
+  p->ticks_since = 0;
+  p->alarm_on = 1;
+  
+  return p->trapframe->a0;
 }

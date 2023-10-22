@@ -101,6 +101,9 @@ struct proc {
   uint64 ticks_since;
   int alarm_on;
 
+  // save registers when sigalarm is called
+  struct trapframe *tf_saved;
+
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
