@@ -1,10 +1,10 @@
 #include "types.h"
 #include "param.h"
-#include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "memlayout.h"
 
 struct cpu cpus[NCPU];
 
@@ -140,6 +140,15 @@ found:
     return 0;
   }
 
+
+  if ((p->usys = (struct usyscall *)kalloc()) == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  p->usys->pid = p->pid;
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -157,9 +166,15 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
-  p->trapframe = 0;
+
+  if(p->usys)
+    kfree((void *)p->usys);
+
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  
+    p->usys = 0;
+  p->trapframe = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -183,6 +198,8 @@ proc_pagetable(struct proc *p)
   if(pagetable == 0)
     return 0;
 
+  
+
   // map the trampoline code (for system call return)
   // at the highest user virtual address.
   // only the supervisor uses it, on the way
@@ -202,6 +219,13 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  if(mappages(pagetable, USYSCALL, PGSIZE, (uint64)(p->usys), PTE_R | PTE_U) < 0) {
+    // unvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    // uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
   return pagetable;
 }
 
@@ -212,7 +236,9 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
+
 }
 
 // a user program that calls exec("/init")
