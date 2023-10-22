@@ -459,7 +459,7 @@ void vmprint_recurent(pagetable_t pagetable, int level) {
       }
       uint64 child = PTE2PA(pte);
       printf("%d: pte %p pa %p\n", k, pte, child);
-      
+
       if (level < 2) {
         vmprint_recurent((pagetable_t)child, level+1);
       }
