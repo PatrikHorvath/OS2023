@@ -102,6 +102,7 @@ extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -128,6 +129,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
 
 // Names of the system calls for trace output
@@ -155,16 +157,16 @@ char *syscallnames[] = {
 [SYS_mkdir]   "mkdir",
 [SYS_close]   "close",
 [SYS_trace]   "trace",
+[SYS_sysinfo] "sysinfo",
 };
 
 void
 syscall(void)
 {
-  int num, trace;
+  int num;
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
-  trace = p->trace_mask;
 
   //panic simulation
   //num = * (int *) 0;
@@ -174,10 +176,9 @@ syscall(void)
     p->trapframe->a0 = syscalls[num]();
 
     // If the process is being traced and the system call matches the mask
-    if((trace & (1 << num))) {
+    if((p->trace_mask & (1 << num))) {
       printf("%d: syscall %s -> %d\n", p->pid, syscallnames[num], p->trapframe->a0);
     }
-
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);

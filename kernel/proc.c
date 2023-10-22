@@ -146,6 +146,8 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->trace_mask = 0;
+
   return p;
 }
 
@@ -160,6 +162,8 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+
+  p->trace_mask = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -296,9 +300,6 @@ fork(void)
   }
   np->sz = p->sz;
 
-  // copy the parent trace_mask
-  np->trace_mask = p->trace_mask;
-
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -314,6 +315,9 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+  // copy the parent trace_mask
+  np->trace_mask = p->trace_mask;
 
   release(&np->lock);
 
@@ -688,4 +692,18 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+
+uint64
+get_nproc(void)
+{
+  struct proc *p;
+  uint64 count = 0;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    if (p->state != UNUSED) {
+      count++;
+    }
+  }
+  return count;
 }
