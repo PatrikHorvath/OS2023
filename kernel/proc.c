@@ -173,7 +173,7 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   
-    p->usys = 0;
+  p->usys = 0;
   p->trapframe = 0;
   p->pagetable = 0;
   p->sz = 0;
