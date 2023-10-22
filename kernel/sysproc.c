@@ -71,12 +71,51 @@ sys_sleep(void)
 
 
 #ifdef LAB_PGTBL
+/**
+ * This system call checks the access bits of a given number of pages starting from a given virtual address.
+ * It sets the corresponding bits in a mask and clears the accessed bits in the page table entries.
+ * The mask is then copied to a user space address.
+ * 
+ * @param void
+ * @return int 0 on success
+ */
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 va; // virtual address
+  int pagenum; // number of pages to check
+  uint64 abitsaddr; // user space address to copy the mask to
+
+  argaddr(0, &va);
+  argint(1, &pagenum); 
+  argaddr(2, &abitsaddr);
+
+  uint64 maskbits = 0;
+  struct proc *proc = myproc();
+
+  // loop through each page and check its access bit
+  for (int i = 0; i < pagenum; i++) {
+    // get page table entry for the page
+    pte_t *pte = walk(proc->pagetable, va+i*PGSIZE, 0);
+
+    if (pte == 0)
+      panic("page does not exist.");
+
+    // if access bit is set, set the corresponding bit in the mask
+    if (PTE_FLAGS(*pte) & PTE_A) { 
+      maskbits = maskbits | (1L << i);
+    }
+    // clear PTE_A, set PTE_A bits zero
+    *pte = ((*pte&PTE_A) ^ *pte) ^ 0;
+  }
+  
+  // copy the mask to user space
+  if (copyout(proc->pagetable, abitsaddr, (char *)&maskbits, sizeof(maskbits)) < 0)
+    panic("sys_pgacess copyout error");
+
   return 0;
 }
+
 #endif
 
 uint64

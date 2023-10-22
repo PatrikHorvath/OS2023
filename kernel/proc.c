@@ -140,7 +140,7 @@ found:
     return 0;
   }
 
-
+  // Allocate a usyscall page. 
   if ((p->usys = (struct usyscall *)kalloc()) == 0) {
     freeproc(p);
     release(&p->lock);
@@ -148,6 +148,7 @@ found:
   }
 
   p->usys->pid = p->pid;
+  printf("proc pid = %d = %d\n", p->pid, p->usys->pid);
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -198,7 +199,10 @@ proc_pagetable(struct proc *p)
   if(pagetable == 0)
     return 0;
 
-  
+  if(mappages(pagetable, USYSCALL, PGSIZE, (uint64)p->usys, PTE_R | PTE_U) < 0) {
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // map the trampoline code (for system call return)
   // at the highest user virtual address.
@@ -206,6 +210,7 @@ proc_pagetable(struct proc *p)
   // to/from user space, so not PTE_U.
   if(mappages(pagetable, TRAMPOLINE, PGSIZE,
               (uint64)trampoline, PTE_R | PTE_X) < 0){
+    //uvmunmap(pagetable, USYSCALL, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
   }
@@ -215,13 +220,7 @@ proc_pagetable(struct proc *p)
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-    uvmfree(pagetable, 0);
-    return 0;
-  }
-
-  if(mappages(pagetable, USYSCALL, PGSIZE, (uint64)(p->usys), PTE_R | PTE_U) < 0) {
-    // unvmunmap(pagetable, TRAMPOLINE, 1, 0);
-    // uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    //uvmunmap(pagetable, USYSCALL, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
   }

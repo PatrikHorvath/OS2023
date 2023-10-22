@@ -141,8 +141,6 @@ static uint64 (*syscalls[])(void) = {
 #endif
 };
 
-
-
 void
 syscall(void)
 {
