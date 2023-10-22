@@ -454,7 +454,8 @@ void vmprint_recurent(pagetable_t pagetable, int level) {
   for(int k = 0; k < 512; k++) {
     pte_t pte = pagetable[k];
     if(pte & PTE_V) {
-      for (int i = 0; i <= level; i++) {
+      printf("..");
+      for (int i = 1; i <= level; i++) {
         printf(" ..");
       }
       uint64 child = PTE2PA(pte);
