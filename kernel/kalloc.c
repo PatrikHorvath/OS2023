@@ -23,10 +23,43 @@ struct {
   struct run *freelist;
 } kmem;
 
+
+
+// COW below
+// structure for reference count
+struct {
+  struct spinlock lock;
+
+  // (PGROUNDUP(PHYSTOP) - KERNBASE)/PGSIZE
+  // is the number of pages in the kernel
+  // so we need an array of that size
+
+  int count[(PGROUNDUP(PHYSTOP) - KERNBASE)/PGSIZE];
+} refcnt;
+// COW above
+
+
+// This macro takes a physical address (pa) and returns the corresponding page table index.
+// It does this by subtracting the kernel base address from the physical address, 
+// then dividing the result by the page size.
+#define PA2IDX(pa) (((uint64)pa - KERNBASE) / PGSIZE)
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+
+
+
+  // COW below
+  // initialize refcnt
+  initlock(&refcnt.lock, "refcnt");
+  for (int i = 0; i < (PGROUNDUP(PHYSTOP)-KERNBASE) / PGSIZE; i++)
+    refcnt.count[i] = 1;
+  // COW above
+
+
+
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -51,11 +84,26 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
+
+
+  // COW below
+  // check refcnt
+  if (krefget(pa) <= 0)
+    panic("kfree_decr");
+
+  // kfree was called, so a process is not using this page anymore
+  // decrement refcnt and if there are no more references
+  // then free the page
+  krefdecr(pa);
+  if (krefget(pa) > 0)
+    return;
+  // COW above
+
+
+
   memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
-
   acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
@@ -75,8 +123,53 @@ kalloc(void)
   if(r)
     kmem.freelist = r->next;
   release(&kmem.lock);
+  
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
+
+  // COW below
+  if(r){
+    memset((char*)r, 5, PGSIZE); // fill with junk // original code
+
+    // acquire lock to edit the reference count
+    // set it to 1, because we are allocating a new page
+    acquire(&refcnt.lock);
+    refcnt.count[PA2IDX(r)] = 1;
+    release(&refcnt.lock);
+    // COW above
+  }
+
+
+
   return (void*)r;
 }
+
+// COW below
+// function to increment the reference count
+void
+krefincr(void *pa)
+{
+  acquire(&refcnt.lock);
+  refcnt.count[PA2IDX(pa)]++;
+  release(&refcnt.lock);
+}
+
+// function to decrement the reference count
+void
+krefdecr(void *pa)
+{
+  acquire(&refcnt.lock);
+  refcnt.count[PA2IDX(pa)]--;
+  release(&refcnt.lock);
+}
+
+// function to get the reference count
+int
+krefget(void *pa)
+{
+  int cnt;
+  acquire(&refcnt.lock);
+  cnt = refcnt.count[PA2IDX(pa)];
+  release(&refcnt.lock);
+  return cnt;
+}
+// COW above

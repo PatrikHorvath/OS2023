@@ -174,6 +174,13 @@ int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 
+// vm.c COW below
+int             cowalloc(pagetable_t, uint64);
+void            krefincr(void *);
+void            krefdecr(void *);
+int             krefget(void *);
+// COW above
+
 // plic.c
 void            plicinit(void);
 void            plicinithart(void);

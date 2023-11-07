@@ -65,6 +65,25 @@ usertrap(void)
     intr_on();
 
     syscall();
+
+
+
+  // COW below
+  // if the trap is a page fault
+  } else if(r_scause() == 15) {
+    uint64 addr = r_stval();
+
+    // kill if the address is bad
+    if (addr >= MAXVA || (addr < p->trapframe->sp && addr >= (p->trapframe->sp - PGSIZE)))
+      p->killed = 1;
+    // call cowalloc to execute COW
+    // if COW fails, kill the process
+    if (cowalloc(p->pagetable, PGROUNDDOWN(addr)) < 0)
+      p->killed = 1;
+  // COW above
+
+
+
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
