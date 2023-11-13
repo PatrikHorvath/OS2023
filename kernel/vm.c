@@ -379,25 +379,72 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    // COW below
     if (cowalloc(pagetable, va0) < 0)
       return -1;
+
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if (pa0 == 0) {
       return -1;
+    }
+    // COW above
 
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
     memmove((void *)(pa0 + (dstva - va0)), src, n);
-
     len -= n;
     src += n;
     dstva = va0 + PGSIZE;
   }
   return 0;
 }
+
+/*
+original
+
+int
+copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
+{
+  uint64 n, va0, pa0;
+  pte_t *pte;
+
+  while(len > 0){
+    va0 = PGROUNDDOWN(dstva);
+    
+      // this can be removed because the check is also inside cowalloc
+    if(va0 >= MAXVA)
+      return -1;
+
+      // we add cowalloc here with check for return -1
+
+      // walk is replaced by walkaddr because we don't need pte
+    pte = walk(pagetable, va0, 0);
+
+      // pte section is not needed
+    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
+       (*pte & PTE_W) == 0)
+      return -1;
+
+      // pa0 is obtained from walkaddr
+    pa0 = PTE2PA(*pte);
+
+      // leave the rest be
+    n = PGSIZE - (dstva - va0);
+    if(n > len)
+      n = len;
+    memmove((void *)(pa0 + (dstva - va0)), src, n);
+    len -= n;
+    src += n;
+    dstva = va0 + PGSIZE;
+  }
+  return 0;
+}
+*/
 
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
@@ -474,6 +521,8 @@ cowalloc(pagetable_t pagetable, uint64 va)
 {
   // check whether va is page-aligned
   if ((va % PGSIZE) != 0) return -1;
+
+  if (va == 0) return -1;
   
   // check whether va is in the range of user address space
   if (va >= MAXVA) return -1;

@@ -74,8 +74,9 @@ usertrap(void)
     uint64 addr = r_stval();
 
     // kill if the address is bad
-    if (addr >= MAXVA || (addr < p->trapframe->sp && addr >= (p->trapframe->sp - PGSIZE)))
+    if ((addr < p->trapframe->sp && addr >= (p->trapframe->sp - PGSIZE)))
       p->killed = 1;
+
     // call cowalloc to execute COW
     // if COW fails, kill the process
     if (cowalloc(p->pagetable, PGROUNDDOWN(addr)) < 0)
