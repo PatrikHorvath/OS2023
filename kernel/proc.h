@@ -1,3 +1,5 @@
+#define VMA_MAX 16
+#define VMA_START 0x3000000000
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -16,6 +18,16 @@ struct context {
   uint64 s9;
   uint64 s10;
   uint64 s11;
+};
+
+struct vma {
+  int used;
+  uint64 addr;
+  int length;
+  int prot;
+  int flags;
+  struct file *file;
+  int offset;
 };
 
 // Per-CPU state.
@@ -104,4 +116,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  uint64 vma_end;
+
+  struct vma vma[VMA_MAX];
 };

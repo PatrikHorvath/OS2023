@@ -146,6 +146,21 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  for(int i=0; i<VMA_MAX; i++) {
+    struct vma *v = (struct vma*)kalloc();
+    v->used = 0;
+    v->addr = 0;
+    v->file = 0;
+    v->flags = 0;
+    v->length = 0;
+    v->flags = 0;
+    v->offset = 0;
+    v->prot = 0;
+    p->vma[i] = *v;
+  }
+
+  // map vma_end at the end of trampoline so at the beginning of the unused memory
+  p->vma_end = VMA_START;
   return p;
 }
 
@@ -320,6 +335,14 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+
+  for(int i=0; i<VMA_MAX; i++) {
+    np->vma[i] = p->vma[i];
+    if(np->vma[i].used == 1) {
+      filedup(np->vma[i].file);
+    }
+  }
+
   release(&np->lock);
 
   return pid;

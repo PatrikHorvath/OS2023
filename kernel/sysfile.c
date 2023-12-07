@@ -503,3 +503,107 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void){
+  int length;
+  int prot, flags, fd, offset;
+
+  argint(1, &length);
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+  argint(5, &offset);
+
+ if (length == 0 || prot == 0 || flags == 0 || fd == 0){
+    return -1;
+  }
+  
+  struct proc *p = myproc();
+  struct vma *v = 0;
+
+  if(flags & MAP_SHARED && !p->ofile[fd]->writable && prot & PROT_WRITE){
+    return -1;
+  }
+
+  for(int i = 0; i<VMA_MAX; i++){
+    if(p->vma[i].used == 0){
+      v = &p->vma[i];
+      break;
+    }
+  }
+
+  if (v == 0){
+    // no vma available
+    return -1;
+  }
+
+  v->used = 1;
+  v->addr = p->vma_end;
+  v->length = length;
+  v->prot = prot;
+  v->flags = flags;
+  filedup(p->ofile[fd]);
+  v->file = p->ofile[fd];
+  v->offset = 0;
+
+  p->vma_end += length; 
+
+  return v->addr;
+};
+
+uint64
+sys_munmap(void){
+
+  uint64 addr;
+  int length;
+
+  argaddr(0, &addr);
+  argint(1, &length);
+
+  if(length == 0 || addr < VMA_START  || addr >= MAXVA - 2*PGSIZE){
+    return -1;
+  }
+
+  struct proc *p = myproc();
+  addr = PGROUNDDOWN(addr);
+  length = PGROUNDUP(length);
+
+  for(int i = 0; i<VMA_MAX; i++) {
+    struct vma *v = &p->vma[i];
+    if(p->vma[i].used == 1 && addr >= v->addr && addr < v->addr + v->length) {
+
+      if(v->flags & MAP_SHARED) {
+        filewrite(v->file, addr, length);
+      }
+
+      pte_t *pte = walk(p->pagetable, addr, 0);
+      if(*pte & PTE_V) {
+        uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
+      }
+
+      if(addr == v->addr) {
+        v->addr += length;
+        v->length -= length;
+        v->offset += length;
+      } else {
+        v->length -= length;
+      }
+
+      if(v->length == 0) {
+        v->used = 0;
+        v->addr = 0;
+        v->length = 0;
+        v->prot = 0;
+        v->flags = 0;
+        v->offset = 0;
+        fileclose(v->file);
+        v->file = 0;
+      }
+
+      break;
+    }
+  }
+
+  return 0;
+};

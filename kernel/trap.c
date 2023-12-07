@@ -3,8 +3,12 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -65,9 +69,58 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if (r_scause() == 13 || r_scause() == 15) {
+    // find whether fault address belongs to a vma
+    uint64 va = r_stval();
+    struct vma *v = 0;
+    (void)v;
+
+    if(va == 0 || va >= MAXVA)
+      goto kill_process;
+    
+    for(int i = 0; i < VMA_MAX; i++) {
+      if(p->vma[i].used == 1 && va < p->vma[i].addr + p->vma[i].length && va >= p->vma[i].addr) {
+        v = &p->vma[i];
+        break;
+      }
+    }
+
+    // allocate a page for the fault address
+    char *mem = kalloc();
+    if(mem == 0)
+      goto kill_process;
+
+    memset(mem, 0, PGSIZE);
+
+    uint off = PGROUNDDOWN(va) - v->addr + v->offset;
+
+    // read the file vma and copy the contents to the allocated page
+    struct file *f = v->file;
+    ilock(f->ip);
+    if((readi(f->ip, 0, (uint64)mem, off, PGSIZE)) <= 0) {
+      iunlock(f->ip);
+      kfree(mem);
+      goto kill_process;
+    }
+      
+    iunlock(f->ip);
+
+    // map the page to the fault address
+    int flags = PTE_U|PTE_V;
+    if (v->prot & PROT_WRITE)
+      flags |= PTE_W;
+    if (v->prot & PROT_READ)
+      flags |= PTE_R;
+
+    if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, flags) != 0){
+      kfree(mem);
+      goto kill_process;
+    }
+
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+    kill_process:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

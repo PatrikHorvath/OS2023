@@ -123,6 +123,7 @@ mmap_test(void)
   // should be able to map file opened read-only with private writable
   // mapping
   p = mmap(0, PGSIZE*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+
   if (p == MAP_FAILED)
     err("mmap (2)");
   if (close(fd) == -1)
